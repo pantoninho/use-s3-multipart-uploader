@@ -1,6 +1,6 @@
 /** @type {import("prettier").Config} */
 export default {
     singleQuote: true,
-    trailingComma: "all",
+    trailingComma: 'all',
     tabWidth: 4,
 };

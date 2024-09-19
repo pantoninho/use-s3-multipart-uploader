@@ -7,7 +7,7 @@
     "scripts": {
         "test": "vitest",
         "coverage": "vitest run --coverage",
-        "lint": "eslint --fix tests lib index",
+        "lint": "eslint --fix tests index.js",
         "format": "prettier --write ."
     },
     "keywords": [],
