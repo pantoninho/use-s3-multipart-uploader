@@ -12,7 +12,7 @@ npm install use-s3-multipart-uploader
 
 ```jsx
 import React from 'react';
-import { useS3MultipartUploader } from '@pantoninho/use-s3-multipart-uploader';
+import { useS3MultipartUploader } from 'use-s3-multipart-uploader';
 import axios from 'axios';
 
 function App() {

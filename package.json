@@ -1,6 +1,6 @@
 {
     "name": "use-s3-multipart-uploader",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "this package provides a simple way to upload large files to S3 using the multipart upload API.",
     "type": "module",
     "main": "index.js",
