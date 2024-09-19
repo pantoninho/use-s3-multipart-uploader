@@ -5,7 +5,7 @@ this package provides a simple way to upload large files to S3 using the multipa
 ## installation
 
 ```sh
-npm install @pantoninho/use-s3-multipart-uploader
+npm install use-s3-multipart-uploader
 ```
 
 ## usage

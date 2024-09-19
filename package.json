@@ -1,50 +1,50 @@
 {
-  "name": "use-s3-multipart-uploader",
-  "version": "0.1.0",
-  "description": "this package provides a simple way to upload large files to S3 using the multipart upload API.",
-  "type": "module",
-  "main": "index.js",
-  "scripts": {
-    "test": "vitest",
-    "coverage": "vitest run --coverage",
-    "lint": "eslint --fix tests index.js",
-    "format": "prettier --write ."
-  },
-  "keywords": [],
-  "author": "pantoninho",
-  "license": "MIT",
-  "peerDependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.10.0",
-    "@testing-library/dom": "^10.4.0",
-    "@testing-library/react": "^16.0.1",
-    "@types/eslint": "^9.6.1",
-    "@vitest/coverage-v8": "^2.0.5",
-    "eslint": "^9.10.0",
-    "eslint-plugin-react": "^7.35.2",
-    "globals": "^15.9.0",
-    "jsdom": "^25.0.0",
-    "msw": "^2.4.4",
-    "prettier": "^3.3.3",
-    "typescript": "^5.6.2",
-    "vitest": "^2.0.5"
-  },
-  "dependencies": {
-    "@pantoninho/use-uploader": "*",
-    "axios": "^1.7.7"
-  },
-  "directories": {
-    "test": "tests"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/pantoninho/use-s3-multipart-uploader.git"
-  },
-  "bugs": {
-    "url": "https://github.com/pantoninho/use-s3-multipart-uploader/issues"
-  },
-  "homepage": "https://github.com/pantoninho/use-s3-multipart-uploader#readme"
+    "name": "use-s3-multipart-uploader",
+    "version": "0.1.1",
+    "description": "this package provides a simple way to upload large files to S3 using the multipart upload API.",
+    "type": "module",
+    "main": "index.js",
+    "scripts": {
+        "test": "vitest",
+        "coverage": "vitest run --coverage",
+        "lint": "eslint --fix tests index.js",
+        "format": "prettier --write ."
+    },
+    "keywords": [],
+    "author": "pantoninho",
+    "license": "MIT",
+    "peerDependencies": {
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.10.0",
+        "@testing-library/dom": "^10.4.0",
+        "@testing-library/react": "^16.0.1",
+        "@types/eslint": "^9.6.1",
+        "@vitest/coverage-v8": "^2.0.5",
+        "eslint": "^9.10.0",
+        "eslint-plugin-react": "^7.35.2",
+        "globals": "^15.9.0",
+        "jsdom": "^25.0.0",
+        "msw": "^2.4.4",
+        "prettier": "^3.3.3",
+        "typescript": "^5.6.2",
+        "vitest": "^2.0.5"
+    },
+    "dependencies": {
+        "@pantoninho/use-uploader": "*",
+        "axios": "^1.7.7"
+    },
+    "directories": {
+        "test": "tests"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/pantoninho/use-s3-multipart-uploader.git"
+    },
+    "bugs": {
+        "url": "https://github.com/pantoninho/use-s3-multipart-uploader/issues"
+    },
+    "homepage": "https://github.com/pantoninho/use-s3-multipart-uploader#readme"
 }
