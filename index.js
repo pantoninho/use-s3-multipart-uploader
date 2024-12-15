@@ -1,52 +1,52 @@
 import { useUploader } from '@pantoninho/use-uploader';
-import axios from 'axios';
 
-/**
- * extends @pantoninho/use-uploader to upload files to S3 using the multipart upload API
- *
- * @param {object} params params
- * @param {number} params.threads number of concurrent threads
- */
 export function useS3MultipartUploader({
-    threads = 5,
-    chunkSize = 10 * 1024 * 1024, // 10MB
-    initialize,
+    chunkSize = 10 * 1024 * 1024,
+    initializer,
     getPresignedUrls,
-    finalize,
-}) {
-    const uploader = useUploader({
+    finalizer,
+    threads,
+    uploadFile,
+} = {}) {
+    const { upload, uploads, isUploading } = useUploader({
         threads,
-        uploadChunk,
+        uploadFile,
     });
 
-    async function upload({ file }) {
-        const numberOfChunks = Math.ceil(file.size / chunkSize);
-        const { fileId, fileKey } = await initialize({ file });
-        const urls = await getPresignedUrls({
-            fileId,
-            fileKey,
-            numberOfChunks,
-        });
-        const results = await uploader.upload({ file, to: urls });
-        const parts = await Promise.all(
-            results.map((part, i) => partResponseToFinalizeInput(part, i)),
-        );
-        return await finalize({ fileId, fileKey, parts });
-    }
+    const multiPartUploads = mergeMultipartUploads(uploads);
 
     return {
-        ...uploader,
-        upload,
+        uploads: multiPartUploads,
+        isUploading,
+        upload: async (file) => {
+            try {
+                const numberOfChunks = Math.ceil(file.size / chunkSize);
+                const uploadRequest = await initializer(file);
+                const urls = await getPresignedUrls(
+                    uploadRequest,
+                    numberOfChunks,
+                );
+                const chunks = urls.map((url, i) => {
+                    const blob = file.slice(i * chunkSize, (i + 1) * chunkSize);
+                    return { file: new File([blob], file.name), to: url };
+                });
+
+                return upload(chunks, {
+                    onComplete: (responses) => {
+                        const parts = responses.map((r, i) =>
+                            partResponseToFinalizeInput(r.data, i),
+                        );
+                        return finalizer(uploadRequest, parts);
+                    },
+                });
+            } catch (error) {
+                // set error in uploads object
+                console.error(error);
+            }
+        },
     };
 }
 
-/**
- * transforms a part upload response into an object required by the s3 upload finalization.
- *
- * @param {Response} response http response from S3 for a part upload
- * @param {number} partIndex part index
- * @returns {{ETag: string, PartNumber: number}} input for the finalize function
- */
 function partResponseToFinalizeInput(response, partIndex) {
     if (!response.headers.etag) {
         throw new InvalidPartResponseError(
@@ -60,16 +60,43 @@ function partResponseToFinalizeInput(response, partIndex) {
     };
 }
 
-/**
- * uploads a chunk to a url using axios
- * @param {object} params params
- * @param {Blob} params.chunk chunk to upload
- * @param {string} params.url url to upload the chunk to
- * @param {function} params.onProgress on progress callback
- * @returns {Promise<Response>} http response
- */
-async function uploadChunk({ chunk, url, onProgress }) {
-    return await axios.put(url, chunk, { onUploadProgress: onProgress });
+function mergeMultipartUploads(uploads) {
+    uploads = Object.keys(uploads).reduce((multiPartUploads, uploadId) => {
+        const upload = uploads[uploadId];
+
+        if (!multiPartUploads[upload.file.name]) {
+            multiPartUploads[upload.file.name] = { parts: [] };
+        }
+
+        multiPartUploads[upload.file.name].parts.push(upload);
+        return multiPartUploads;
+    }, {});
+
+    return Object.keys(uploads).reduce((multiPartUploads, fileKey) => {
+        const fileUploads = uploads[fileKey];
+
+        return {
+            ...multiPartUploads,
+            [fileKey]: {
+                parts: fileUploads.parts,
+                isUploading: fileUploads.parts.some((part) => part.isUploading),
+                progress: fileUploads.parts.reduce(
+                    (loaded, part) => loaded + part.loaded,
+                    0,
+                ),
+                loaded: fileUploads.parts.reduce(
+                    (loaded, part) => loaded + part.loaded,
+                    0,
+                ),
+                total: fileUploads.parts.reduce(
+                    (total, part) => total + part.total,
+                    0,
+                ),
+                data: null,
+                error: null,
+            },
+        };
+    }, {});
 }
 
 export class InvalidPartResponseError extends Error {}

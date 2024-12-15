@@ -1,78 +1,99 @@
+import { setupServer } from 'msw/node';
 import { renderHook } from '@testing-library/react';
 import { useS3MultipartUploader } from '../index.js';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+    afterAll,
+    afterEach,
+    beforeAll,
+    describe,
+    expect,
+    it,
+    vi,
+} from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import axios from 'axios';
+
+export const server = setupServer(
+    ...[
+        http.put('https://upload.example/part/*', ({ request, params }) => {
+            return HttpResponse.json(request.url, {
+                headers: { etag: params[0] },
+            });
+        }),
+    ],
+);
 
 const FILE_SIZE_MB = 10;
 const buffer = new ArrayBuffer(1024 * 1024 * FILE_SIZE_MB);
 const file = new File([buffer], 'test.png');
 
 describe('useS3MultipartUploader', () => {
-    /** @type {import("msw/node").SetupServerApi} */
-    let server;
-
-    afterEach(() => {
-        server.close();
-        server.dispose();
-    });
+    beforeAll(() => server.listen());
+    afterEach(() => server.resetHandlers());
+    afterAll(() => server.close());
 
     it('should call initialize, getPresignedUrls, and finalize', async () => {
         const FILE_KEY = 'file-key';
-        const FILE_ID = 'file-id';
+        const UPLOAD_ID = 'upload-id';
         const CHUNK_SIZE = 1024 * 1024 * 2;
         const EXPECTED_NR_CHUNKS = Math.ceil(file.size / CHUNK_SIZE);
 
-        const handlers = [
-            http.put('https://upload.example/part/*', ({ request, params }) => {
-                return HttpResponse.json(request.url, {
-                    headers: { etag: params[0] },
-                });
-            }),
-        ];
-
-        server = setupServer(...handlers);
-        server.listen();
-
-        const initialize = vi.fn(() => ({
-            fileId: FILE_ID,
+        const initializer = vi.fn(() => ({
+            uploadId: UPLOAD_ID,
             fileKey: FILE_KEY,
         }));
 
-        const getPresignedUrls = vi.fn(({ numberOfChunks }) =>
-            new Array(numberOfChunks)
-                .fill()
-                .map((_, i) => `https://upload.example/part/${i}`),
+        await axios.put('https://upload.example/part/0');
+
+        const getPresignedUrls = vi.fn(
+            ({ uploadId, fileKey }, numberOfChunks) =>
+                new Array(numberOfChunks)
+                    .fill()
+                    .map((_, i) => `https://upload.example/part/${i}`),
         );
 
-        const finalize = vi.fn();
+        const finalizer = vi.fn(() => ({ data: 'hello world' }));
 
-        const { result: hook } = renderHook(() =>
+        const { result: hook, rerender } = renderHook(() =>
             useS3MultipartUploader({
                 chunkSize: CHUNK_SIZE,
-                initialize,
+                initializer,
                 getPresignedUrls,
-                finalize,
+                finalizer,
+                uploadFile: axiosUpload,
             }),
         );
 
-        await hook.current.upload({ file });
+        await hook.current.upload(file);
+        rerender();
 
-        expect(initialize).toHaveBeenCalledTimes(1);
-        expect(initialize).toHaveBeenCalledWith({ file });
+        while (hook.current.isUploading) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        expect(initializer).toHaveBeenCalledTimes(1);
+        expect(initializer).toHaveBeenCalledWith(file);
         expect(getPresignedUrls).toHaveBeenCalledTimes(1);
-        expect(getPresignedUrls).toHaveBeenCalledWith({
-            fileId: FILE_ID,
-            fileKey: FILE_KEY,
-            numberOfChunks: EXPECTED_NR_CHUNKS,
-        });
-        expect(finalize).toHaveBeenCalledTimes(1);
-        expect(finalize).toHaveBeenCalledWith({
-            fileId: FILE_ID,
-            fileKey: FILE_KEY,
-            parts: new Array(EXPECTED_NR_CHUNKS)
+        expect(getPresignedUrls).toHaveBeenCalledWith(
+            { uploadId: UPLOAD_ID, fileKey: FILE_KEY },
+            EXPECTED_NR_CHUNKS,
+        );
+        expect(finalizer).toHaveBeenCalledTimes(1);
+        expect(finalizer).toHaveBeenCalledWith(
+            { uploadId: UPLOAD_ID, fileKey: FILE_KEY },
+            new Array(EXPECTED_NR_CHUNKS)
                 .fill()
                 .map((_, i) => ({ ETag: i.toString(), PartNumber: i + 1 })),
-        });
+        );
     });
 });
+
+async function axiosUpload(file, to) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    return {
+        headers: {
+            etag: to.split('/').pop(),
+        },
+    };
+}
