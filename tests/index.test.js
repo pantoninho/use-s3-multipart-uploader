@@ -16,7 +16,8 @@ import axios from 'axios';
 export const server = setupServer(
     ...[
         http.put('https://upload.example/part/*', ({ request, params }) => {
-            return HttpResponse.json(request.url, {
+            return new HttpResponse(request.url, {
+                status: 200,
                 headers: { etag: params[0] },
             });
         }),
@@ -60,7 +61,7 @@ describe('useS3MultipartUploader', () => {
                 initializer,
                 getPresignedUrls,
                 finalizer,
-                uploadFile: axiosUpload,
+                uploadFile: uploadPart,
             }),
         );
 
@@ -88,12 +89,10 @@ describe('useS3MultipartUploader', () => {
     });
 });
 
-async function axiosUpload(file, to) {
+async function uploadPart(file, to) {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     return {
-        headers: {
-            etag: to.split('/').pop(),
-        },
+        ETag: to.split('/').pop(),
     };
 }

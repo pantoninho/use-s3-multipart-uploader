@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useUploader } from '@pantoninho/use-uploader';
 
 export function useS3MultipartUploader({
@@ -18,45 +19,36 @@ export function useS3MultipartUploader({
     return {
         uploads: multiPartUploads,
         isUploading,
+        uploadFile: uploadPart,
         upload: async (file) => {
-            try {
-                const numberOfChunks = Math.ceil(file.size / chunkSize);
-                const uploadRequest = await initializer(file);
-                const urls = await getPresignedUrls(
-                    uploadRequest,
-                    numberOfChunks,
-                );
-                const chunks = urls.map((url, i) => {
-                    const blob = file.slice(i * chunkSize, (i + 1) * chunkSize);
-                    return { file: new File([blob], file.name), to: url };
-                });
+            const numberOfChunks = Math.ceil(file.size / chunkSize);
+            const uploadRequest = await initializer(file);
+            const urls = await getPresignedUrls(uploadRequest, numberOfChunks);
+            const chunks = urls.map((url, i) => {
+                const blob = file.slice(i * chunkSize, (i + 1) * chunkSize);
+                return { file: new File([blob], file.name), to: url };
+            });
 
-                return upload(chunks, {
-                    onComplete: (responses) => {
-                        const parts = responses.map((r, i) =>
-                            partResponseToFinalizeInput(r.data, i),
-                        );
-                        return finalizer(uploadRequest, parts);
-                    },
-                });
-            } catch (error) {
-                // set error in uploads object
-                console.error(error);
-            }
+            return upload(chunks, {
+                onComplete: (responses) => {
+                    return finalizer(
+                        uploadRequest,
+                        responses.map((r, i) => ({
+                            ETag: r.data.ETag,
+                            PartNumber: i + 1,
+                        })),
+                    );
+                },
+            });
         },
     };
 }
 
-function partResponseToFinalizeInput(response, partIndex) {
-    if (!response.headers.etag) {
-        throw new InvalidPartResponseError(
-            `Part ${partIndex} response does not have an ETag header`,
-        );
-    }
+async function uploadPart(part, to, onUploadProgress) {
+    const { headers } = await axios.put(to, part, { onUploadProgress });
 
     return {
-        ETag: response.headers.etag.replaceAll('"', ''),
-        PartNumber: partIndex + 1,
+        ETag: headers.etag.replaceAll('"', ''),
     };
 }
 
@@ -80,10 +72,15 @@ function mergeMultipartUploads(uploads) {
             [fileKey]: {
                 parts: fileUploads.parts,
                 isUploading: fileUploads.parts.some((part) => part.isUploading),
-                progress: fileUploads.parts.reduce(
-                    (loaded, part) => loaded + part.loaded,
-                    0,
-                ),
+                progress:
+                    fileUploads.parts.reduce(
+                        (loaded, part) => loaded + part.loaded,
+                        0,
+                    ) /
+                    fileUploads.parts.reduce(
+                        (total, part) => total + part.total,
+                        0,
+                    ),
                 loaded: fileUploads.parts.reduce(
                     (loaded, part) => loaded + part.loaded,
                     0,
@@ -92,8 +89,7 @@ function mergeMultipartUploads(uploads) {
                     (total, part) => total + part.total,
                     0,
                 ),
-                data: null,
-                error: null,
+                error: fileUploads.parts.some((part) => part.error),
             },
         };
     }, {});
