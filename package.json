@@ -4,7 +4,7 @@
     "description": "this package provides a simple way to upload large files to S3 using the multipart upload API.",
     "type": "module",
     "main": "index.js",
-    "types": "types/index.d.ts",
+    "types": "index.d.ts",
     "scripts": {
         "test": "vitest",
         "coverage": "vitest run --coverage",

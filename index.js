@@ -2,8 +2,23 @@ import React from 'react';
 import axios from 'axios';
 import { useTaskQueue } from 'use-task-queue';
 
-export class UploadInProgressError extends Error {}
+/**
+ * Error thrown when an upload is already in progress
+ * @extends {Error}
+ */
 
+export class UploadInProgressError extends Error {
+  constructor() {
+    super('An upload is already in progress');
+    this.name = 'UploadInProgressError';
+  }
+}
+
+/**
+ * React hook for handling S3 multipart uploads with progress tracking
+ * @param {import('./index.js').UseS3MultipartUploaderOptions} options - Configuration options
+ * @returns {import('./index.js').S3MultipartUploader} Uploader instance
+ */
 export function useS3MultipartUploader({
     threads = 4,
     initializeUpload,
@@ -11,6 +26,7 @@ export function useS3MultipartUploader({
 }) {
     const queue = useTaskQueue({ concurrent: threads });
 
+    /** @type {[UploadState, React.Dispatch<React.SetStateAction<UploadState>>]} */
     const [state, setState] = React.useState({
         isUploading: false,
         parts: {},
