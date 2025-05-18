@@ -1,84 +1,137 @@
 # useS3MultipartUploader
 
-this package provides a simple way to upload large files to S3 using the multipart upload API.
+A React hook for handling S3 multipart uploads with progress tracking and concurrent upload support.
 
-## installation
+## Installation
 
 ```sh
 npm install use-s3-multipart-uploader
 ```
 
-## usage
+## Usage
 
 ```jsx
 import React from 'react';
 import { useS3MultipartUploader } from 'use-s3-multipart-uploader';
-import axios from 'axios';
 
 function App() {
-    const { upload, state } = useS3MultipartUploader({
-        threads: 5,
-        initialize: async (file) => {
-            // initialize s3 multipart upload
-            // this initialization should be done on the server side
-            // refer to aws s3 documentation for more information
-            return { fileKey: 'fileKey', fileId: 'fileId' };
+    const { upload, state, progress, isUploading, clearState } = useS3MultipartUploader({
+        threads: 4, // Number of concurrent uploads
+        initializeUpload: async (fileInfo) => {
+            // Call your backend to initialize the multipart upload
+            // This should return an object with:
+            // - urls: Array of presigned URLs for each part
+            // - uploadId: The S3 upload ID
+            // - fileKey: The S3 object key
+            // - chunkSize: The size of each chunk in bytes
+            const response = await fetch('/api/init-upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: fileInfo.name,
+                    size: fileInfo.size,
+                    type: fileInfo.type
+                })
+            });
+            return response.json();
         },
-        getPresignedUrls: async ({ fileKey, fileId, numberOfChunks }) => {
-            // get presigned urls for uploading parts
-            // this should be done on the server side
-            // refer to aws s3 documentation for more information
-            return ['url1', 'url2', 'url3'];
-        },
-        finalize: async ({ fileKey, fileId, parts }) => {
-            // finalize s3 multipart upload
-            // this should be done on the server side
-            // refer to aws s3 documentation for more information
-        },
+        finalizeUpload: async (uploadInfo, parts) => {
+            // Call your backend to complete the multipart upload
+            // parts is an array of { ETag, PartNumber } objects
+            const response = await fetch('/api/complete-upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fileKey: uploadInfo.fileKey,
+                    uploadId: uploadInfo.uploadId,
+                    parts
+                })
+            });
+            return response.json();
+        }
     });
 
-    const handleUpload = async (file) => {
-        await upload({ file });
+    const handleFileChange = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        try {
+            const result = await upload(file, {
+                // Optional: Transform chunks before upload (e.g., encrypt, compress)
+                processChunk: async (chunk) => {
+                    // Example: return await encryptChunk(chunk);
+                    return chunk;
+                },
+                // Optional: Number of retry attempts for failed part uploads (default: 3)
+                retries: 3
+            });
+            console.log('Upload completed:', result);
+        } catch (error) {
+            console.error('Upload failed:', error);
+        }
     };
 
     return (
         <div>
             <input
                 type="file"
-                onChange={(e) => handleUpload(e.target.files[0])}
+                onChange={handleFileChange}
+                disabled={isUploading}
             />
-            {Object.keys(state.uploads).map((filename) => (
-                <p key={filename}>
-                    {state.uploads[filename].isUploading
-                        ? `${filename}: ${state.uploads[filename].progress}`
-                        : `${filename}: upload complete`}
-
-                    {state.uploads[filename].error &&
-                        `${filename}: ${state.uploads[filename].error.message}`}
-                </p>
+            
+            {isUploading && (
+                <div>
+                    <progress value={progress * 100} max="100" />
+                    <div>Uploading: {Math.round(progress * 100)}%</div>
+                </div>
+            )}
+            
+            {/* Optional: Show detailed part upload status */}
+            {Object.entries(state.parts).map(([url, part]) => (
+                <div key={url}>
+                    Part {part.index + 1}: {part.loaded}/{part.total} bytes
+                </div>
             ))}
         </div>
     );
 }
 ```
 
-## API
+## API Reference
 
 ### `useS3MultipartUploader(options)`
 
-a hook for uploading files to S3 using the multipart upload API.
+A React hook that provides S3 multipart upload functionality.
 
-#### options
+#### Options
 
--   `threads` (number): the number of concurrent uploads. Default is `5`.
--   `initialize` (async function): a function that initializes the multipart upload. This function should return an object with `fileKey` and `fileId`.
--   `getPresignedUrls` (async function): a function that returns an array of presigned urls for uploading parts.
--   `finalize` (async function): a function that finalizes the multipart upload.
+- `threads` (number, optional): Number of concurrent uploads. Default is `4`.
+- `initializeUpload` (async function): A function that initializes the multipart upload. Receives file info and should return:
+  - `urls`: Array of presigned URLs for each part
+  - `uploadId`: The S3 upload ID
+  - `fileKey`: The S3 object key
+  - `chunkSize`: Size of each chunk in bytes
+- `finalizeUpload` (async function): A function called to complete the upload. Receives upload info and parts array, should return the final result.
 
-#### returns
+#### Returns
 
--   `upload` (function): a function that starts the upload process.
--   `data` (object): the data returned by the `finalize` function.
--   `error` (Error): the error that occurred during the upload process.
--   `progress` (number): the progress of the upload process.
--   `isUploading` (boolean): a flag indicating whether the upload is in progress.
+An object with:
+- `upload`: Function to start the upload process. Accepts a File object and options.
+- `state`: Current upload state including individual part status.
+- `progress`: Overall upload progress (0 to 1).
+- `isUploading`: Boolean indicating if an upload is in progress.
+- `clearState`: Function to reset the upload state.
+
+## Error Handling
+
+The hook throws an `UploadInProgressError` if you try to start a new upload while one is already in progress. You can import and check for this error:
+
+```jsx
+try {
+    await upload(file);
+} catch (error) {
+    if (error.name === 'UploadInProgressError') {
+        console.log('An upload is already in progress');
+    }
+}
+```
