@@ -1,6 +1,6 @@
 {
     "name": "use-s3-multipart-uploader",
-    "version": "0.4.0",
+    "version": "0.4.2",
     "description": "this package provides a simple way to upload large files to S3 using the multipart upload API.",
     "type": "module",
     "main": "index.js",
@@ -15,8 +15,8 @@
     "author": "pantoninho",
     "license": "MIT",
     "peerDependencies": {
-        "react": "^18.3.1",
-        "react-dom": "^18.3.1"
+        "react": "^18 || ^19",
+        "react-dom": "^18 || ^19"
     },
     "devDependencies": {
         "@eslint/js": "^9.10.0",

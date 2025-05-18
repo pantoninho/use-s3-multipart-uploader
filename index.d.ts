@@ -34,7 +34,7 @@ export interface CompletePart {
   PartNumber: number;
 }
 
-export interface UseS3MultipartUploaderOptions {
+export interface UseS3MultipartUploaderOptions<T> {
   /** Number of concurrent uploads (default: 4) */
   threads?: number;
   
@@ -42,10 +42,10 @@ export interface UseS3MultipartUploaderOptions {
   initializeUpload: (fileInfo: InitializeUploadParams) => Promise<InitializeUploadResponse>;
   
   /** Function to finalize the upload after all parts are uploaded */
-  finalizeUpload: (params: FinalizeUploadParams, parts: CompletePart[]) => Promise<void>;
+  finalizeUpload: (params: FinalizeUploadParams, parts: CompletePart[]) => Promise<T>;
 }
 
-export interface S3MultipartUploader {
+export interface S3MultipartUploader<T> {
   /** Current upload state */
   state: UploadState;
   
@@ -69,7 +69,7 @@ export interface S3MultipartUploader {
     options?: {
       processChunk?: (chunk: Blob) => Blob | Promise<Blob>;
     }
-  ) => Promise<string>;
+  ) => Promise<T>;
 }
 
 export class UploadInProgressError extends Error {
@@ -81,8 +81,8 @@ export class UploadInProgressError extends Error {
  * @param options Configuration options for the uploader
  * @returns Object with upload controls and state
  */
-declare function useS3MultipartUploader(
-  options: UseS3MultipartUploaderOptions
-): S3MultipartUploader;
+declare function useS3MultipartUploader<T>(
+  options: UseS3MultipartUploaderOptions<T>
+): S3MultipartUploader<T>;
 
-export default useS3MultipartUploader;
+export { useS3MultipartUploader }

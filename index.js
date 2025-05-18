@@ -113,11 +113,10 @@ export function useS3MultipartUploader({
             );
 
             const completeParts = await Promise.all(promises);
-
-            await finalizeUpload({ fileKey, uploadId }, completeParts);
+            const result = await finalizeUpload({ fileKey, uploadId }, completeParts);
 
             setState((state) => ({ ...state, isUploading: false }));
-            return fileKey;
+            return result;
         },
     };
 }
