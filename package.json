@@ -34,8 +34,8 @@
         "vitest": "^2.0.5"
     },
     "dependencies": {
-        "@pantoninho/use-uploader": "0.7.0",
-        "axios": "^1.7.7"
+        "axios": "^1.7.7",
+        "use-task-queue": "^0.1.0"
     },
     "directories": {
         "test": "tests"

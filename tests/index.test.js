@@ -42,25 +42,21 @@ describe('useS3MultipartUploader', () => {
         const initializer = vi.fn(() => ({
             uploadId: UPLOAD_ID,
             fileKey: FILE_KEY,
+            chunkSize: CHUNK_SIZE,
+            urls: new Array(EXPECTED_NR_CHUNKS)
+                .fill()
+                .map((_, i) => `https://upload.example/part/${i}`),
         }));
 
         await axios.put('https://upload.example/part/0');
-
-        const getPresignedUrls = vi.fn(
-            ({ uploadId, fileKey }, numberOfChunks) =>
-                new Array(numberOfChunks)
-                    .fill()
-                    .map((_, i) => `https://upload.example/part/${i}`),
-        );
 
         const finalizer = vi.fn(() => ({ data: 'hello world' }));
 
         const { result: hook, rerender } = renderHook(() =>
             useS3MultipartUploader({
                 chunkSize: CHUNK_SIZE,
-                initializer,
-                getPresignedUrls,
-                finalizer,
+                initializeUpload: initializer,
+                finalizeUpload: finalizer,
                 uploadFile: uploadPart,
             }),
         );
@@ -73,12 +69,11 @@ describe('useS3MultipartUploader', () => {
         }
 
         expect(initializer).toHaveBeenCalledTimes(1);
-        expect(initializer).toHaveBeenCalledWith(file);
-        expect(getPresignedUrls).toHaveBeenCalledTimes(1);
-        expect(getPresignedUrls).toHaveBeenCalledWith(
-            { uploadId: UPLOAD_ID, fileKey: FILE_KEY },
-            EXPECTED_NR_CHUNKS,
-        );
+        expect(initializer).toHaveBeenCalledWith({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+        });
         expect(finalizer).toHaveBeenCalledTimes(1);
         expect(finalizer).toHaveBeenCalledWith(
             { uploadId: UPLOAD_ID, fileKey: FILE_KEY },

@@ -1,98 +1,120 @@
+import React from 'react';
 import axios from 'axios';
-import { useUploader } from '@pantoninho/use-uploader';
+import { useTaskQueue } from 'use-task-queue';
+
+export class UploadInProgressError extends Error {}
 
 export function useS3MultipartUploader({
-    chunkSize = 10 * 1024 * 1024,
-    initializer,
-    getPresignedUrls,
-    finalizer,
-    threads,
-    uploadFile,
-} = {}) {
-    const { upload, uploads, isUploading } = useUploader({
-        threads,
-        uploadFile,
+    threads = 4,
+    initializeUpload,
+    finalizeUpload,
+}) {
+    const queue = useTaskQueue({ concurrent: threads });
+
+    const [state, setState] = React.useState({
+        isUploading: false,
+        parts: {},
     });
 
-    const multiPartUploads = mergeMultipartUploads(uploads);
+    const totalLoaded = Object.values(state.parts).reduce(
+        (acc, { loaded }) => acc + loaded,
+        0,
+    );
+
+    const total = Object.values(state.parts).reduce(
+        (acc, { total }) => acc + total,
+        0,
+    );
+
+    const totalProgress = total ? totalLoaded / total : 0;
 
     return {
-        uploads: multiPartUploads,
-        isUploading,
-        uploadFile: uploadPart,
-        upload: async (file) => {
-            const numberOfChunks = Math.ceil(file.size / chunkSize);
-            const uploadRequest = await initializer(file);
-            const urls = await getPresignedUrls(uploadRequest, numberOfChunks);
-            const chunks = urls.map((url, i) => {
-                const blob = file.slice(i * chunkSize, (i + 1) * chunkSize);
-                return { file: new File([blob], file.name), to: url };
-            });
+        state,
+        isUploading: state.isUploading,
+        progress: totalProgress,
+        clearState: () => setState({ isUploading: false, parts: {} }),
+        upload: async (file, { processChunk } = {}) => {
+            // TODO: implement multiple file uploads
+            if (state.isUploading) {
+                throw new UploadInProgressError();
+            }
 
-            return upload(chunks, {
-                onComplete: (responses) => {
-                    return finalizer(
-                        uploadRequest,
-                        responses.map((r, i) => ({
-                            ETag: r.data.ETag,
-                            PartNumber: i + 1,
-                        })),
-                    );
-                },
+            setState({ isUploading: true, parts: {} });
+
+            const data = await initializeUpload({
+                name: file.name,
+                size: file.size,
+                type: file.type,
             });
+            const { urls, uploadId, fileKey, chunkSize } = data;
+
+            setState((state) => ({
+                ...state,
+                parts: urlsToPartState(urls, chunkSize),
+            }));
+
+            async function uploadPart(url, i) {
+                let chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
+
+                if (processChunk) {
+                    chunk = await processChunk(chunk);
+                }
+
+                const res = await axios.put(url, chunk, {
+                    onUploadProgress: (e) => {
+                        setState((state) => ({
+                            ...state,
+                            parts: {
+                                ...state.parts,
+                                [url]: {
+                                    loaded: e.loaded,
+                                    total: e.total || chunk.size,
+                                    index: i,
+                                },
+                            },
+                        }));
+                    },
+                });
+
+                const ETag = res.headers.etag.replaceAll('"', '');
+
+                setState((state) => ({
+                    ...state,
+                    parts: {
+                        ...state.parts,
+                        [url]: {
+                            loaded: chunk.size,
+                            total: chunk.size,
+                            index: i,
+                            ETag,
+                            PartNumber: i + 1,
+                        },
+                    },
+                }));
+
+                return { ETag, PartNumber: i + 1 };
+            }
+
+            const promises = urls.map((url, i) =>
+                queue.add(() => uploadPart(url, i), { retries: 3 }),
+            );
+
+            const completeParts = await Promise.all(promises);
+
+            await finalizeUpload({ fileKey, uploadId }, completeParts);
+
+            setState((state) => ({ ...state, isUploading: false }));
+            return fileKey;
         },
     };
 }
 
-async function uploadPart(part, to, onUploadProgress) {
-    const { headers } = await axios.put(to, part, { onUploadProgress });
-
-    return {
-        ETag: headers.etag.replaceAll('"', ''),
-    };
+function urlsToPartState(urls, chunkSize) {
+    return urls.reduce(
+        (acc, url, i) => ({
+            ...acc,
+            [url]: { loaded: 0, total: chunkSize, index: i },
+        }),
+        {},
+    );
 }
-
-function mergeMultipartUploads(uploads) {
-    uploads = Object.keys(uploads).reduce((multiPartUploads, uploadId) => {
-        const upload = uploads[uploadId];
-
-        if (!multiPartUploads[upload.file.name]) {
-            multiPartUploads[upload.file.name] = { parts: [] };
-        }
-
-        multiPartUploads[upload.file.name].parts.push(upload);
-        return multiPartUploads;
-    }, {});
-
-    return Object.keys(uploads).reduce((multiPartUploads, fileKey) => {
-        const fileUploads = uploads[fileKey];
-
-        return {
-            ...multiPartUploads,
-            [fileKey]: {
-                parts: fileUploads.parts,
-                isUploading: fileUploads.parts.some((part) => part.isUploading),
-                progress:
-                    fileUploads.parts.reduce(
-                        (loaded, part) => loaded + part.loaded,
-                        0,
-                    ) /
-                    fileUploads.parts.reduce(
-                        (total, part) => total + part.total,
-                        0,
-                    ),
-                loaded: fileUploads.parts.reduce(
-                    (loaded, part) => loaded + part.loaded,
-                    0,
-                ),
-                total: fileUploads.parts.reduce(
-                    (total, part) => total + part.total,
-                    0,
-                ),
-                error: fileUploads.parts.some((part) => part.error),
-            },
-        };
-    }, {});
-}
-
-export class InvalidPartResponseError extends Error {}
