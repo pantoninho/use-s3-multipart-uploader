@@ -4,7 +4,6 @@ import { useTaskQueue } from 'use-task-queue';
 
 /**
  * Error thrown when an upload is already in progress
- * @extends {Error}
  */
 
 export class UploadInProgressError extends Error {
@@ -16,8 +15,6 @@ export class UploadInProgressError extends Error {
 
 /**
  * React hook for handling S3 multipart uploads with progress tracking
- * @param {import('./index.js').UseS3MultipartUploaderOptions} options - Configuration options
- * @returns {import('./index.js').S3MultipartUploader} Uploader instance
  */
 export function useS3MultipartUploader({
     threads = 4,
