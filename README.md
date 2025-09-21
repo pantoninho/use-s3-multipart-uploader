@@ -1,5 +1,9 @@
 # useS3MultipartUploader
 
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/de5931b57dee443ba2b06547303c1ce2)](https://app.codacy.com/gh/pantoninho/use-s3-multipart-uploader/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Codacy Coverage](https://app.codacy.com/project/badge/Coverage/de5931b57dee443ba2b06547303c1ce2)](https://app.codacy.com/gh/pantoninho/use-s3-multipart-uploader/dashboard?utm_source=github.com&utm_medium=referral&utm_content=pantoninho/use-s3-multipart-uploader&utm_campaign=Badge_Coverage)
+[![CI](https://github.com/pantoninho/use-s3-multipart-uploader/actions/workflows/codacy.yml/badge.svg)](https://github.com/pantoninho/use-s3-multipart-uploader/actions/workflows/codacy.yml)
+
 A React hook for handling S3 multipart uploads with progress tracking and concurrent upload support.
 
 ## Installation
