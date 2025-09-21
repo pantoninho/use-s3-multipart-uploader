@@ -120,6 +120,7 @@ A React hook that provides S3 multipart upload functionality.
 #### Returns
 
 An object with:
+
 - `upload`: Function to start the upload process. Accepts a File object and options.
 - `state`: Current upload state including individual part status.
 - `progress`: Overall upload progress (0 to 1).
